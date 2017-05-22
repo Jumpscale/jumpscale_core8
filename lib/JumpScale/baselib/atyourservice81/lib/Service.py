@@ -271,7 +271,7 @@ class Service:
         data = j.data.serializer.json.loads(self.model.dataJSON)
         for key, value in args.items():
             sanitized_key = j.data.hrd.sanitize_key(key)
-            if sanitized_key in data and data[sanitized_key] != value:
+            if sanitized_key in data and data[sanitized_key] != value or sanitized_key not in data:
                 self.processChange(actor=actor, changeCategory="dataschema", args=args)
                 break
 
