@@ -166,6 +166,11 @@ class AtYourServiceRepo():
         self._run_scheduler = None
         self.__run_scheduler_task = None
 
+        try:
+            self._run_scheduler_task
+        except:
+            self.logger.warning("The scheduler for the ays repo {} didn't start, [known issue](https://github.com/Jumpscale/jumpscale_core8/issues/921)".format(self.name))
+
         j.atyourservice._loadActionBase()
 
         self._load_services()
