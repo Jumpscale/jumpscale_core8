@@ -14,8 +14,12 @@ sanic_app.config['REQUEST_TIMEOUT'] = 3600
 
 def handle_sigterm():
     print('Stopping')
+    j.atyourservice._stop()
     for task in asyncio.Task.all_tasks():
         task.cancel()
+    exit(0)
+
+signal.signal(signal.SIGTERM, handle_sigterm)
 
 def configure_logger(level):
     if level == 'DEBUG':
@@ -49,7 +53,7 @@ def main(host, port, log, dev):
     @sanic_app.listener('before_server_start')
     async def init_ays(sanic, loop):
         loop.set_debug(debug)
-        loop.add_signal_handler(signal.SIGINT, handle_sigterm)
+        loop.add_signal_handler(signal.SIGTERM, handle_sigterm)
         j.atyourservice.debug = debug
         j.atyourservice.dev_mode = dev
         if j.atyourservice.dev_mode:
@@ -62,7 +66,7 @@ def main(host, port, log, dev):
 
     @sanic_app.listener('after_stop')
     async def stop_ays(sanic, loop):
-        loop.run_until_complete(asyncio.gather(j.atyourservice._stop()))
+        await j.atyourservice._stop()
 
     # start server
     sanic_app.run(debug=debug, host=host, port=port, workers=1)
