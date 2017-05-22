@@ -9,6 +9,8 @@ from JumpScale.baselib.atyourservice81.lib.AtYourServiceTester import AtYourServ
 import colored_traceback
 import os
 import sys
+import inotify.adapters
+import threading
 if "." not in sys.path:
     sys.path.append(".")
 
@@ -17,6 +19,47 @@ import asyncio
 
 colored_traceback.add_hook(always=True)
 
+
+class AYSNotify(inotify.adapters.InotifyTrees):
+
+    def event_gen(self):
+        """This is a secondary generator that wraps the principal one, and
+        adds/removes watches as directories are added/removed.
+        """
+
+        for event in self._i.event_gen():
+            if event is not None:
+                (header, type_names, path, filename) = event
+
+                if header.mask & inotify.constants.IN_ISDIR:
+                    full_path = os.path.join(path, filename)
+
+                    if header.mask & inotify.constants.IN_CREATE:
+                        if not any(filename.startswith(i.encode()) for i in '._'):
+                            self._i.add_watch(full_path, self._mask)
+                    elif header.mask & inotify.constants.IN_DELETE:
+                        self._i.remove_watch(full_path, superficial=True)
+
+            yield event
+
+    def __load_trees(self, paths):
+
+        q = paths
+        while q:
+            current_path = q[0]
+            del q[0]
+
+            if any(current_path.startswith(i.encode()) for i in '._'):
+                continue
+
+            self._i.add_watch(current_path, self._mask)
+
+            for filename in os.listdir(current_path):
+                entry_filepath = os.path.join(current_path, filename)
+                if os.path.isdir(entry_filepath) is False:
+                    continue
+
+                q.append(entry_filepath)
 
 class AtYourServiceFactory:
 
@@ -28,6 +71,7 @@ class AtYourServiceFactory:
         self.debug = j.core.db.get("atyourservice.debug") == 1
         self.dev_mode = False
         self.logger = j.logger.get('j.atyourservice')
+        self.started = False
 
         self.baseActions = {}
         self.templateRepos = None
@@ -79,11 +123,54 @@ class AtYourServiceFactory:
         self.loop = loop or asyncio.get_event_loop()
         self.templateRepos = TemplateRepoCollection()  # actor templates repositories
         self.aysRepos = AtYourServiceRepoCollection()  # ays repositories
+        self.started = True
+        t = threading.Thread(target=self._watch_repos)
+        t.start()
         if not self._cleanupHandle:
             self._cleanupHandle = self.loop.call_soon(self.cleanup)
 
+    def _watch_repos(self):
+        with open('/proc/sys/fs/inotify/max_user_watches') as f:
+            num = f.read().strip()
+        error_message = """Inotify Error
+------------------ ERROR ------------------
+Inotify returned an error, it probably happened because of the inotify limit of the system which is {}
+you can increase this value using:
+echo <the new value> > /proc/sys/fs/inotify/max_user_watches
+-------------------------------------------""".format(num)
+        try:
+            mask = inotify.constants.IN_MOVE | inotify.constants.IN_CREATE | inotify.constants.IN_DELETE
+            i = AYSNotify([d.encode() for d in [j.dirs.VARDIR, j.dirs.CODEDIR]], mask=mask)
+        except inotify.calls.InotifyError as e:
+                self.logger.warn("inotify error %s" % e)
+                self.logger.error(error_message)
+                # TODO: fall back to reloading every 60 seconds
+                raise
+
+        self.logger.info("Watching repos for changes")
+
+        while self.started:
+            try:
+                for event in i.event_gen():
+                    if not self.started:
+                        return
+                    if event is not None:
+                        (header, type_names, dirname, filename) = event
+                        for repos in [self.aysRepos, self.templateRepos]:
+                            try:
+                                if any(dirname.decode().startswith(d) for d in repos.FSDIRS):
+                                    repos.handle_fs_events(dirname.decode(), filename.decode(), event)
+                            except Exception as e:
+                                print(e)
+                else:
+                    break
+            except inotify.calls.InotifyError as e:
+                self.logger.warn("inotify error %s" % e)
+                self.logger.error(error_message)
+
     async def _stop(self):
         self.logger.info("stopping AtYourService")
+        self.started = False
         to_wait = [repo.stop() for repo in self.aysRepos.list()]
         await asyncio.wait(to_wait)
 

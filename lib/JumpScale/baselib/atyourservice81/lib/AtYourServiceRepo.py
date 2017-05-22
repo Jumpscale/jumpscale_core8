@@ -12,12 +12,14 @@ from JumpScale.baselib.atyourservice81.lib.RunScheduler import RunScheduler
 
 import asyncio
 from collections import namedtuple
+import inotify
 
 import colored_traceback
 colored_traceback.add_hook(always=True)
 
 
 class AtYourServiceRepoCollection:
+    FSDIRS = [j.dirs.VARDIR, j.dirs.CODEDIR]
 
     def __init__(self):
         self.logger = j.logger.get('j.atyourservice')
@@ -28,26 +30,43 @@ class AtYourServiceRepoCollection:
     def _load(self):
         self.logger.info("reload AYS repos")
         # search repo on the filesystem
-        for dir_path in [j.dirs.VARDIR, j.dirs.CODEDIR]:
+        for dir_path in self.FSDIRS:
             self.logger.debug("search ays repo in {}".format(dir_path))
             for path in self._searchAysRepos(dir_path):
-                if path not in self._repos:
-                    self.logger.debug("AYS repo found {}".format(path))
-                    try:
-                        repo = AtYourServiceRepo(path)
-                        self._repos[repo.path] = repo
-                    except Exception as e:
-                        self.logger.exception("can't load repo at {}: {}".format(path, str(e)))
-                        if j.atyourservice.debug:
-                            raise
+                self.logger.debug("AYS repo found {}".format(path))
+                try:
+                    repo = AtYourServiceRepo(path, loop=self._loop)
+                    self._repos[repo.path] = repo
+                except Exception as e:
+                    self.logger.exception("can't load repo at {}: {}".format(path, str(e)))
+                    if j.atyourservice.debug:
+                        raise
 
-        # make sure all loaded repo still exists
-        for repo in list(self._repos.values()):
-            if not j.sal.fs.exists(repo.path):
-                self.logger.info("repo {} doesnt exists anymore, unload".format(repo.path))
-                del self._repos[repo.path]
+    def handle_fs_events(self, dirname, filename, event):
+        if filename.endswith('.log'):
+            return
 
-        self._loop.call_later(60, self._load)
+        full_path = j.sal.fs.joinPaths(dirname, filename)
+        current_path = full_path
+        while current_path:
+            if j.sal.fs.exists(j.sal.fs.joinPaths(current_path, '.ays')):
+                if event[0].mask & (inotify.constants.IN_MOVED_TO | inotify.constants.IN_CREATE):
+                    if current_path not in self._repos:
+                        self.logger.debug("AYS repo added {}".format(current_path))
+                        try:
+                            repo = AtYourServiceRepo(current_path, loop=self._loop)
+                            self._repos[repo.path] = repo
+                        except Exception as e:
+                            self.logger.exception("can't load repo at {}: {}".format(current_path, str(e)))
+                            if j.atyourservice.debug:
+                                raise
+                return
+            current_path = j.sal.fs.getParent(current_path)
+        if event[0].mask & (inotify.constants.IN_MOVED_FROM | inotify.constants.IN_DELETE):
+            if filename in ['.ays', '.git'] or full_path in self._repos:
+                repo_path = dirname if filename in ['.ays', '.git'] else full_path
+                self.logger.debug("AYS repo removed {}".format(full_path))
+                self._repos.pop(repo_path, None)
 
     def loadRepo(self, path):
         ayspath = j.sal.fs.joinPaths(path, ".ays")
@@ -56,7 +75,7 @@ class AtYourServiceRepoCollection:
         if path not in self._repos:
             self.logger.debug("Loading AYS repo {}".format(path))
             try:
-                repo = AtYourServiceRepo(path)
+                repo = AtYourServiceRepo(path, loop=self._loop)
                 self._repos[repo.path] = repo
             except Exception as e:
                 self.logger.error('can not load repo at {}: {}'.format(path, str(e)))
@@ -103,7 +122,7 @@ class AtYourServiceRepoCollection:
             'https://raw.githubusercontent.com/github/gitignore/master/Python.gitignore', j.sal.fs.joinPaths(path, '.gitignore'))
 
         # TODO lock
-        self._repos[path] = AtYourServiceRepo(path=path)
+        self._repos[path] = AtYourServiceRepo(path=path, loop=self._loop)
         print("AYS Repo created at %s" % path)
         return self._repos[path]
 
@@ -134,21 +153,34 @@ DBTuple = namedtuple("DB", ['actors', 'services'])
 
 class AtYourServiceRepo():
 
-    def __init__(self, path):
+    def __init__(self, path, loop=None):
         self.logger = j.logger.get('j.atyourservice')
         self.path = j.sal.fs.pathNormalize(path).rstrip("/")
         self.name = j.sal.fs.getBaseName(self.path)
         self.git = j.clients.git.get(self.path, check_path=False)
         self._db = None
         self.no_exec = False
-        self._loop = asyncio.get_event_loop()
 
-        self.run_scheduler = RunScheduler(self)
-        self._run_scheduler_task = self._loop.create_task(self.run_scheduler.start())
+        self._loop = loop or asyncio.get_event_loop()
+
+        self._run_scheduler = None
+        self.__run_scheduler_task = None
 
         j.atyourservice._loadActionBase()
 
         self._load_services()
+
+    @property
+    def run_scheduler(self):
+        if self._run_scheduler is None:
+            self._run_scheduler = RunScheduler(self)
+        return self._run_scheduler
+
+    @property
+    def _run_scheduler_task(self):
+        if self.__run_scheduler_task is None:
+            self.__run_scheduler_task = self._loop.create_task(self.run_scheduler.start())
+        return self.__run_scheduler_task
 
     @property
     def db(self):
