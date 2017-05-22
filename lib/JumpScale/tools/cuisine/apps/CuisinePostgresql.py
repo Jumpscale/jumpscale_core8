@@ -4,7 +4,7 @@ app = j.tools.cuisine._getBaseAppClass()
 
 
 class CuisinePostgresql(app):
-    NAME = "postgres"
+    NAME = "psql"
 
     def build(self):
         postgre_url = 'https://ftp.postgresql.org/pub/source/v9.6.1/postgresql-9.6.1.tar.gz'
@@ -14,6 +14,7 @@ class CuisinePostgresql(app):
         self.cuisine.core.dir_ensure("$JSAPPSDIR/pgsql")
         self.cuisine.core.dir_ensure("$BINDIR")
         self.cuisine.core.dir_ensure("$LIBDIR/postgres")
+        self.cuisine.package.multiInstall(['build-essential', 'zlib1g-dev'])
         cmd = """
         apt-get --assume-yes install libreadline-dev
         cd $TMPDIR/postgresql-9.6.1
