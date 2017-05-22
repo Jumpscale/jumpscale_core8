@@ -59,3 +59,5 @@ pyenv install 3.6.1
 pyenv shell 3.6.1
 
 ```
+
+If you already have a jupmscale installation, please make sure to install new dependency for AYS through `pip install git+https://github.com/gigforks/PyInotify`
