@@ -32,6 +32,15 @@ _name_to_mode = {
 }
 
 
+SILLY = 4
+logging.addLevelName(SILLY, "SILLY")
+
+
+def silly(self, msg, *args, **kws):
+    self._log(SILLY, msg, args, **kws)
+
+logging.Logger.silly = silly
+
 class Handlers():
 
     def __init__(self):
