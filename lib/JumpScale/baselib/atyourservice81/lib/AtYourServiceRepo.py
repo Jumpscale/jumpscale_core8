@@ -209,14 +209,15 @@ class AtYourServiceRepo():
         stop run scheduler and wait for it to complete current runs and reties
         also stops all recurring actions in the services in the repo.
         """
+        for service in self.services:
+            service.stop()
         if j.atyourservice.debug:
             await self.run_scheduler.stop(timeout=3)
         else:
             await self.run_scheduler.stop(timeout=30)
             await self._run_scheduler_task
 
-        for service in self.services:
-            service.stop()
+
 
     async def delete(self):
 
