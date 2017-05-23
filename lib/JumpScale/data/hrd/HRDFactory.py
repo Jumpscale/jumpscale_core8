@@ -10,7 +10,6 @@ class HRDFactory:
     def __init__(self):
         self.__jslocation__ = "j.data.hrd"
         self.logger = j.logger.get("j.data.hrd")
-        self.logger.disabled = True
 
     def sanitize_key(self, key):
         """

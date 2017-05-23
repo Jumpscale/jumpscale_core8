@@ -216,7 +216,6 @@ struct Schema {
         collection = self.getModelCollection(schema, category="test", modelBaseClass=None, db=mydb, indexDb=mydb)
         start = time.time()
         print("start populate 100.000 records")
-        collection.logger.disabled = True
         for i in range(100000):
             obj = collection.new()
             obj.dbobj.name = "test%s" % i
