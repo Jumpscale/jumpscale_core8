@@ -148,7 +148,6 @@ class JobModel(ModelBase):
                                          self.dbobj.actionName, self.dbobj.state, self.dbobj.serviceKey, self.dbobj.lastModDate)
             self.collection._index.index_remove(keys=index)
             self.collection._db.delete(self.key)
-            self.logger.handlers = []
             del self.logger
 
     def __repr__(self):

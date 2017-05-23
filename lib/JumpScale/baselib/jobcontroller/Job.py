@@ -60,7 +60,6 @@ def _execute_cb(job, future):
             service_action_obj.state = 'ok'
         if job.service:
             job.service.model.dbobj.state = 'ok'
-
         job.logger.info("job {} done sucessfuly".format(str(job)))
     if service_action_obj.period > 0:  # recurring action.
         job.model.delete()
@@ -88,20 +87,6 @@ def generate_profile(job):
             job.model.dbobj.profileData = j.sal.fs.fileGetBinaryContents(stat_file)
             j.sal.fs.remove(stat_file)
 
-class JobHandler(logging.Handler):
-    def __init__(self, job_model, level=logging.NOTSET):
-        super().__init__(level=level)
-        self._job_model = job_model
-
-    def emit(self, record):
-        if record.levelno <= 20:
-            category = 'msg'
-        elif 20 < record.levelno <= 30:
-            category = 'alert'
-        else:
-            category = 'errormsg'
-        self._job_model.log(msg=record.getMessage(), level=record.levelno, category=category, epoch=int(record.created), tags='')
-
 
 class Job:
     """
@@ -116,12 +101,7 @@ class Job:
         self._future = None
         self.saveService = True
         self._sourceLoader = None
-        self.logger = j.logger.get('j.jobcontroller.job.{}'.format(self.model.key), new=True)
-        self._logHandler = JobHandler(self.model)
-        self.logger.addHandler(self._logHandler)
-
-    def __del__(self):
-        self.cleanup()
+        self.logger = j.logger.get('j.jobcontroller.job.{}'.format(self.model.key))
 
     @property
     def _loop(self):
@@ -131,25 +111,6 @@ class Job:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         return loop
-
-    def cleanup(self):
-        """
-        clean the logger handler from the job object so it doesn't make the job stays in memory
-        """
-        self.logger.removeHandler(self._logHandler)
-        jc_log_refs = j.logger.logging.manager.loggerDict['j.jobcontroller']
-        job_log_refs = j.logger.logging.manager.loggerDict['j.jobcontroller.job']
-
-        # Properly cleaning logger referernces in logging module to avoid memory leaks.
-        jc_log_refs.loggerMap.pop(self.logger, None)
-        job_log_refs.loggerMap.pop(self.logger, None)
-        j.logger.logging.manager.loggerDict.pop(self.logger.name, None)
-
-        for h in self.logger.handlers:
-            self.logger.removeHandler(h)
-        self._logHandler = None
-        self.logger = None
-
 
     @property
     def action(self):
@@ -189,7 +150,7 @@ class Job:
                 try:
                     self._service = repo.serviceGetByKey(self.model.dbobj.serviceKey)
                 except j.exceptions.NotFound:
-                    self.logger.warning("job {} tried to access a non existing service {}".format(self,self.model.dbobj.serviceKey ))
+                    self.logger.warning("job {} tried to access a non existing service {}".format(self, self.model.dbobj.serviceKey))
                     return None
         return self._service
 
@@ -313,8 +274,8 @@ class Job:
         return out
 
     def __repr__(self):
-        out = "job: %s!%s (%s)" % (
-            (self.model.dbobj.actorName, self.model.dbobj.serviceName, self.model.dbobj.actionName))
+        out = "job:%s!%s!%s (%s)" % (
+            (self.model.key, self.model.dbobj.actorName, self.model.dbobj.serviceName, self.model.dbobj.actionName))
         return out
 
     __str__ = __repr__
