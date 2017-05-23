@@ -1,10 +1,10 @@
 from JumpScale import j
 
 from JSLogger import JSLogger
-from Filter import ModuleFilter
+from Filter import ModuleFilter, JobFilter
 import time
 import logging
-
+import re
 import sys
 def embed():
     return "embed" in sys.__dict__
@@ -40,6 +40,7 @@ def silly(self, msg, *args, **kws):
     self._log(SILLY, msg, args, **kws)
 
 logging.Logger.silly = silly
+
 
 class Handlers():
 
@@ -144,6 +145,7 @@ class LoggerFactory:
         self.set_level(level)
         if filter:
             self.handlers.consoleHandler.addFilter(ModuleFilter(filter))
+            self.handlers.consoleHandler.addFilter(JobFilter())
 
     def get(self, name=None, new=False):
         """
