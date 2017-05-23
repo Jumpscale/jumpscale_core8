@@ -42,13 +42,43 @@ def silly(self, msg, *args, **kws):
 logging.Logger.silly = silly
 
 
+class JobHandler(logging.Handler):
+
+    def emit(self, record):
+
+        if record.levelno <= 20:
+            category = 'msg'
+        elif 20 < record.levelno <= 30:
+            category = 'alert'
+        else:
+            category = 'errormsg'
+        job = j.core.jobcontroller.db.jobs.get(record.jobid)
+        if job is not None:
+            job.log(record.getMessage(), level=record.levelno, category=category, epoch=int(record.created), tags='')
+            job.save()
+
+
 class Handlers():
 
     def __init__(self):
         self._fileRotateHandler = None
         self._consoleHandler = None
         self._memoryHandler = None
+        self._jobHandler = None
         self._all = []
+
+
+    @property
+    def jobHandler(self):
+        if self._jobHandler is None:
+            self._jobHandler = JobHandler()
+            self._jobHandler.setLevel(logging.DEBUG)
+            formatter = logging.Formatter(FILE_FORMAT)
+            self._jobHandler.setFormatter(formatter)
+            self._jobHandler.addFilter(JobFilter())
+            self._all.append(self._jobHandler)
+
+        return self._jobHandler
 
     @property
     def fileRotateHandler(self, name='jumpscale'):
@@ -143,9 +173,9 @@ class LoggerFactory:
     def init(self, mode, level, filter=[]):
         self.set_mode(mode.upper())
         self.set_level(level)
+
         if filter:
             self.handlers.consoleHandler.addFilter(ModuleFilter(filter))
-            self.handlers.consoleHandler.addFilter(JobFilter())
 
     def get(self, name=None, new=False):
         """
@@ -214,6 +244,7 @@ class LoggerFactory:
         logging.lastResort = None
         self.enableConsoleHandler()
         self.logging.addHandler(self.handlers.fileRotateHandler)
+        self.logging.addHandler(self.handlers.jobHandler)
 
     def __fileRotateHandler(self, name='jumpscale'):
         if not j.sal.fs.exists("%s/log/" % j.dirs.VARDIR):
