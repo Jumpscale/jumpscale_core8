@@ -69,23 +69,24 @@ class Node:
         return the first disk that is eligible to be used as filesystem cache
         First try to find a SSH disk, otherwise return a HDD
         """
+        priorities = [DiskType.ssd, DiskType.hdd, DiskType.nvme]
+        eligible = {t: [] for t in priorities}
         # Pick up the first ssd
         usedisks = []
         for pool in (self._client.btrfs.list() or []):
             for device in pool['devices']:
                 usedisks.append(device['path'])
         for disk in disks[::-1]:
-            if disk.devicename in usedisks:
-                disks.remove(disk)
+            if disk.devicename in usedisks or len(disk.partitions) > 0:
                 continue
-            if disk.type in [DiskType.ssd, DiskType.nvme]:
-                return disk
-            elif disk.type == DiskType.cdrom:
-                disks.remove(disk)
-            if len(disk.partitions) > 0:
-                disks.remove(disk)
-        # If no SSD found, pick up the first disk
-        return disks[0]
+            if disk.type in priorities:
+                eligible[disk.type].append(disk)
+        # pick up the first disk according to priorities
+        for t in priorities:
+            if eligible[t]:
+                return eligible[t][0]
+        else:
+            raise RuntimeError("cannot find eligible disks for the fs cache")
 
     def _mount_fscache(self, storagepool):
         """
