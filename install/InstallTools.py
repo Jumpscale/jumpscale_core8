@@ -634,10 +634,9 @@ class GitMethods():
             except Exception as e:
                 base, provider, account, repo, dest, url = self.getGitRepoArgs(
                     url, dest, login, passwd, reset=reset, ssh=False, codeDir=codeDir, executor=executor)
-                checkdir = "%s/.git" % (dest)
-                existsGit = self.exists(checkdir) if not executor else executor.exists(checkdir)
-                if existsGit:
-                    self.delete(checkdir)
+                existsDir = self.exists(dest) if not executor else executor.exists(dest)
+                if existsDir:
+                    self.delete(dest)
                 return self.pullGitRepo(url, dest, login, passwd, depth, ignorelocalchanges,
                                         reset, branch, tag=tag, revision=revision, ssh=False, executor=executor)
 
@@ -651,7 +650,9 @@ class GitMethods():
         checkdir = "%s/.git" % (dest)
         existsGit = self.exists(checkdir) if not executor else executor.exists(checkdir)
 
-        if existsGit:
+        if existsDir:
+            if not existsGit:
+                raise RuntimeError('%s not a git repository.' % dest)
             # if we don't specify the branch, try to find the currently checkedout branch
             cmd = 'cd %s; git rev-parse --abbrev-ref HEAD' % dest
             rc, out, err = self.execute(cmd, die=False, showout=False, executor=executor)
