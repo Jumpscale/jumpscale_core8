@@ -173,7 +173,7 @@ echo <the new value> > /proc/sys/fs/inotify/max_user_watches
         self.started = False
         to_wait = [repo.stop() for repo in self.aysRepos.list()]
         self.loop.run_until_complete(asyncio.gather(*to_wait))
-        self.loop.close()
+
 
     @property
     def actorTemplates(self):
