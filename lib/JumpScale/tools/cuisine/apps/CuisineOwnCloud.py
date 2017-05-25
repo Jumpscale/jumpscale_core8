@@ -249,7 +249,6 @@ class CuisineOwnCloud(app):
         """.format(dbhost=dbhost, dbuser=dbuser, dbpass=dbpass, ip=privateIp)
 
         self.cuisine.core.run(C)
-
         # TODO: if not installed
         cmd = """
         $JSAPPSDIR/php/bin/php $JSAPPSDIR/owncloud/occ maintenance:install  --database="mysql" --database-name="owncloud"\
@@ -287,7 +286,7 @@ class CuisineOwnCloud(app):
             self.cuisine.core.file_write("$JSCFGDIR/apache2/sites-enabled/owncloud.conf", apachesiteconf)
             self.cuisine.apps.apache2.stop()
             C = """
-            chown -R daemon:daemon $appDir/owncloud
+            chown -R daemon:daemon $JSAPPSDIR/owncloud
             chmod 777 -R $appDir/owncloud/config
             chown -R daemon:daemon /data
             """
