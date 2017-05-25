@@ -79,21 +79,27 @@ class DocGenerator:
         return self.gitRepos[path]
 
     def installDeps(self, reset=False):
-        if int(j.core.db.get("docgenerator:installed")) == 1 and reset == False:
+        if int(j.core.db.get("docgenerator:installed") or 0) == 1 and reset == False:
             return
         cuisine = j.tools.cuisine.local
         cuisine.apps.nodejs.install()
-        cuisine.core.run("sudo npm install -g phantomjs-prebuilt", profile=True)
-        cuisine.core.run("sudo npm install -g mermaid", profile=True)
+
+        def hugoInstall():
+            # Using package install will result in an old version on some machines
+            cuisine.core.file_download('https://github.com/spf13/hugo/releases/download/v0.20.7/hugo_0.20.7_Linux-64bit.tar.gz', '$TMPDIR/hugo_0.20.7_Linux-64bit.tar.gz')
+            cuisine.core.file_expand('$TMPDIR/hugo_0.20.7_Linux-64bit.tar.gz')
+            cuisine.core.file_copy('$TMPDIR/hugo_0.20.7_Linux-64bit/hugo', '/usr/local/bin')
+
+        cuisine.core.run("npm install -g phantomjs-prebuilt", profile=True)
+        cuisine.core.run("npm install -g mermaid", profile=True)
         cuisine.apps.caddy.build()
         if "darwin" in str(j.core.platformtype.myplatform):
             cuisine.core.run("brew install graphviz")
             cuisine.core.run("brew install hugo")
         elif "ubuntu" in str(j.core.platformtype.myplatform):
             cuisine.package.install('graphviz')
-            cuisine.package.install('hugo')
+            hugoInstall()
         j.tools.cuisine.local.development.golang.install()
-        j.tools.cuisine.local.apps.caddy.build()
         j.core.db.set("docgenerator:installed", 1)
 
     def startWebserver(self, generateCaddyFile=False):
