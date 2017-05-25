@@ -89,7 +89,7 @@ class AtYourServiceRepoCollection:
 
         res = []
 
-        cmd = """find %s \( -wholename '*.ays' \) -exec readlink -f {} \;""" % (path)
+        cmd = """find %s \( -path '*.ays' \) -exec readlink -f {} \;""" % (path)
         rc, out, err = j.sal.process.execute(cmd, die=False, showout=False)
         for reponame in out.splitlines():
             reponame = reponame.split(".ays")[0]
