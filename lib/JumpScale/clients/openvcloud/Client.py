@@ -205,6 +205,23 @@ class Account(Authorizables):
                 spaces.append(Space(self, space))
         return spaces
 
+    @property
+    def disks(self):
+        """
+        Wrapper to list all disks related to an account
+        :return: list of disks details
+        """
+        return self.client.api.cloudapi.disks.list(accountId=self.id)
+
+    def delete_disk(self, disk_id, detach=True):
+        """
+        Wrapper to delete disk by its id. I think there should be a class for disks to list all its wrappers
+        :param disk_id: integer: The disk id need to be removed 
+        :param detach: boolean: detach the disk from the machine first 
+        :return: 
+        """
+        return self.client.api.cloudapi.disks.delete(diskId=disk_id, detach=detach)
+
     def space_get(self, name, location="", create=True,
                   maxMemoryCapacity=-1, maxVDiskCapacity=-1, maxCPUCapacity=-1, maxNASCapacity=-1,
                   maxNetworkOptTransfer=-1, maxNetworkPeerTransfer=-1, maxNumPublicIP=-1,
