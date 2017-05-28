@@ -1,0 +1,5 @@
+{% for dhcp in dhcps -%}
+{% for host in dhcp.hosts -%}
+{{host.macaddress}},{{host.ipaddress}},{{host.hostname}},infinite
+{% endfor -%}
+{% endfor -%}

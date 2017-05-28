@@ -1,4 +1,5 @@
 import json
+from io import BytesIO
 from JumpScale import j
 
 
@@ -129,6 +130,12 @@ class Container:
         if self._client is None:
             self._client = self.node.client.container.client(self.id)
         return self._client
+
+    def upload_content(self, remote, content):
+        if isinstance(content, str):
+            content = content.encode('utf8')
+        bytes = BytesIO(content)
+        self.client.filesystem.upload(remote, bytes)
 
     def _create_container(self, timeout=60):
         j.sal.g8os.logger.debug("send create container command to g8os")

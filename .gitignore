@@ -68,3 +68,4 @@ lib/JumpScale/jscompl.py
 
 # gitbook
 docs/_book
+.vscode
