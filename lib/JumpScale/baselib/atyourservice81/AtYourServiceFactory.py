@@ -172,7 +172,8 @@ echo <the new value> > /proc/sys/fs/inotify/max_user_watches
         self.logger.info("stopping AtYourService")
         self.started = False
         to_wait = [repo.stop() for repo in self.aysRepos.list()]
-        await asyncio.wait(to_wait)
+        self.loop.run_until_complete(asyncio.gather(*to_wait))
+
 
     @property
     def actorTemplates(self):

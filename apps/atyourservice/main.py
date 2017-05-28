@@ -3,13 +3,12 @@
 import os
 os.environ['LC_ALL'] = 'C.UTF-8'
 os.environ['LANG'] = 'C.UTF-8'
-
 import click
 import logging
 from JumpScale import j
 from JumpScale.baselib.atyourservice81.server.app import app as sanic_app
-
 sanic_app.config['REQUEST_TIMEOUT'] = 3600
+
 
 def configure_logger(level):
     if level == 'DEBUG':
@@ -56,6 +55,7 @@ def main(host, port, log, dev):
     @sanic_app.listener('after_stop')
     async def stop_ays(sanic, loop):
         await j.atyourservice._stop()
+        loop.close()
 
     # start server
     sanic_app.run(debug=debug, host=host, port=port, workers=1)
