@@ -39,7 +39,7 @@ class CuisineCockpit(base):
 
         self.cuisine.apps.atyourservice.install()
         self.cuisine.apps.atyourservice.stop()
-        self.cuisine.apps.atyourservice.configure(production=production, client_secret=ays_secret, client_id=client_id, organization=organization, redirect_address='{ip}:5000' % ip)
+        self.cuisine.apps.atyourservice.configure(production=production, client_secret=ays_secret, client_id=client_id, organization=organization, redirect_address='{ip}:5000'.format(ip=ip))
 
         # configure base URI for api-console
         raml = self.cuisine.core.file_read('$JSAPPSDIR/atyourservice/apidocs/api.raml')
