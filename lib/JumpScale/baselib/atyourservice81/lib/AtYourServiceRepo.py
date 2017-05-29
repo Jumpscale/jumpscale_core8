@@ -10,7 +10,6 @@ from JumpScale.baselib.atyourservice81.lib.AtYourServiceDependencies import get_
 from JumpScale.baselib.atyourservice81.lib.AtYourServiceDependencies import create_job
 from JumpScale.baselib.atyourservice81.lib.RunScheduler import RunScheduler
 
-import asyncio
 from collections import namedtuple
 import inotify
 
@@ -23,7 +22,7 @@ class AtYourServiceRepoCollection:
 
     def __init__(self):
         self.logger = j.logger.get('j.atyourservice')
-        self._loop = asyncio.get_event_loop()
+        self._loop = j.atyourservice.loop
         self._repos = {}
         self._load()
 
@@ -35,7 +34,7 @@ class AtYourServiceRepoCollection:
             for path in self._searchAysRepos(dir_path):
                 self.logger.debug("AYS repo found {}".format(path))
                 try:
-                    repo = AtYourServiceRepo(path, loop=self._loop)
+                    repo = AtYourServiceRepo(path)
                     self._repos[repo.path] = repo
                 except Exception as e:
                     self.logger.exception("can't load repo at {}: {}".format(path, str(e)))
@@ -54,7 +53,7 @@ class AtYourServiceRepoCollection:
                     if current_path not in self._repos:
                         self.logger.debug("AYS repo added {}".format(current_path))
                         try:
-                            repo = AtYourServiceRepo(current_path, loop=self._loop)
+                            repo = AtYourServiceRepo(current_path)
                             self._repos[repo.path] = repo
                         except Exception as e:
                             self.logger.exception("can't load repo at {}: {}".format(current_path, str(e)))
@@ -75,7 +74,7 @@ class AtYourServiceRepoCollection:
         if path not in self._repos:
             self.logger.debug("Loading AYS repo {}".format(path))
             try:
-                repo = AtYourServiceRepo(path, loop=self._loop)
+                repo = AtYourServiceRepo(path)
                 self._repos[repo.path] = repo
             except Exception as e:
                 self.logger.error('can not load repo at {}: {}'.format(path, str(e)))
@@ -122,7 +121,7 @@ class AtYourServiceRepoCollection:
             'https://raw.githubusercontent.com/github/gitignore/master/Python.gitignore', j.sal.fs.joinPaths(path, '.gitignore'))
 
         # TODO lock
-        self._repos[path] = AtYourServiceRepo(path=path, loop=self._loop)
+        self._repos[path] = AtYourServiceRepo(path=path)
         print("AYS Repo created at %s" % path)
         return self._repos[path]
 
@@ -153,7 +152,7 @@ DBTuple = namedtuple("DB", ['actors', 'services'])
 
 class AtYourServiceRepo():
 
-    def __init__(self, path, loop=None):
+    def __init__(self, path):
         self.logger = j.logger.get('j.atyourservice')
         self.path = j.sal.fs.pathNormalize(path).rstrip("/")
         self.name = j.sal.fs.getBaseName(self.path)
@@ -161,31 +160,14 @@ class AtYourServiceRepo():
         self._db = None
         self.no_exec = False
 
-        self._loop = loop or asyncio.get_event_loop()
+        self._loop = j.atyourservice.loop
 
-        self._run_scheduler = None
-        self.__run_scheduler_task = None
-
-        try:
-            self._run_scheduler_task
-        except:
-            self.logger.warning("The scheduler for the ays repo {} didn't start, [known issue](https://github.com/Jumpscale/jumpscale_core8/issues/921)".format(self.name))
+        self.run_scheduler = RunScheduler(self)
+        self._run_scheduler_task = self._loop.create_task(self.run_scheduler.start())
 
         j.atyourservice._loadActionBase()
 
         self._load_services()
-
-    @property
-    def run_scheduler(self):
-        if self._run_scheduler is None:
-            self._run_scheduler = RunScheduler(self)
-        return self._run_scheduler
-
-    @property
-    def _run_scheduler_task(self):
-        if self.__run_scheduler_task is None:
-            self.__run_scheduler_task = self._loop.create_task(self.run_scheduler.start())
-        return self.__run_scheduler_task
 
     @property
     def db(self):
