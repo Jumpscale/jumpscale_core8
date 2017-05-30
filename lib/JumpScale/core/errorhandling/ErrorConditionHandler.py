@@ -157,7 +157,7 @@ class ErrorConditionHandler:
         if not isinstance(exceptionObject, BaseException):
             print(
                 "did not receive an Exceptio object for python exception, this is serious bug.")
-            print("exceptionObject was:\n%s" % exceptionObject)
+            raise ValueError("exceptionObject was:\n%s" % exceptionObject)
 
         if tb is None:
             ttype, exc_value, tb = sys.exc_info()
