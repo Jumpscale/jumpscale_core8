@@ -7,6 +7,7 @@ from multiprocessing import Process, Queue
 import pygments.lexers
 from pygments.formatters import get_formatter_by_name
 import cProfile
+import sys
 
 colored_traceback.add_hook(always=True)
 
@@ -76,6 +77,7 @@ class Job():
             handle = loader.load_module(self.action.key)
             method = eval("handle.action")
             j.core.jobcontroller._methods[self.action.key] = method
+            sys.modules.pop(self.action.key, None)
         return j.core.jobcontroller._methods[self.action.key]
 
     @property
